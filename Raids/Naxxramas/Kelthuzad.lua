@@ -264,7 +264,7 @@ L:RegisterTranslations("esES", function() return {
 ---------------------------------
 
 -- module variables
-module.revision = 20004 -- To be overridden by the module!
+module.revision = 20005 -- To be overridden by the module!
 module.enabletrigger = module.translatedName -- string or table {boss, add1, add2}
 --module.wipemobs = { L["add_name"] } -- adds which will be considered in CheckForEngage
 module.toggleoptions = {"frostbolt", "frostboltbar", -1, "frostblast", "proximity", "fissure", "mc", -1, "fbvolley", -1, "detonate", "detonateicon", -1 ,"guardians", -1, "addcount", "phase", "bosskill"}
@@ -277,19 +277,16 @@ module.proximitySilent = true
 -- locals
 local timer = {
 	phase1 = 320,
-	firstFrostboltVolley = 30,
-	frostboltVolley = {15,30},
-	frostbolt = 2,
+	frostboltVolley = 15,
+	frostboltSingleCastTime = 2,
 	phase2 = 15,
-	firstDetonate = 20,
+	detonateTime = {20,30},
 	detonate = 5,
-	nextDetonate = {20,25},
-	firstFrostblast = 50,
-	frostblast = {30,60},
-	firstMindcontrol = 60,
-	mindcontrol = {60,90},
-	firstGuardians = 5,
-	guardians = 7,
+	frostblastTime = {30,45},
+	firstMindcontrol = 25,
+	mindcontrol = {72,86},
+	firstGuardians = 10,
+	guardians = 5,
 }
 local icon = {
 	abomination = "",
@@ -494,7 +491,7 @@ function module:Affliction(msg)
 
 		if numFrostboltVolleyHits == 4 then
 
-			self:IntervalBar(L["frostbolt_volley"], timer.frostboltVolley[1], timer.frostboltVolley[2], icon.frostboltVolley)
+			self:DelayedBar(0, L["frostbolt_volley"], timer.frostboltVolley, icon.frostboltVolley)
 
 			--[[self:CancelScheduledEvent("bwfbvolley30")
 			self:CancelScheduledEvent("bwfbvolley45")
@@ -504,7 +501,7 @@ function module:Affliction(msg)
 			self:ScheduleEvent("bwfbvolley60", self.Volley, 45, self) ]] -- why 3 times?
 
 			self:CancelDelayedBar(L["frostbolt_volley"])
-			self:DelayedIntervalBar(timer.frostboltVolley[2], L["frostbolt_volley"], timer.frostboltVolley[1], timer.frostboltVolley[2], icon.frostboltVolley)
+			self:DelayedBar(timer.frostboltVolley, L["frostbolt_volley"], timer.frostboltVolley, icon.frostboltVolley)
 		end
 	end
 end
@@ -516,7 +513,7 @@ function module:Event(msg)
 	end
 
 	-- frost bolt
-	if GetTime() < frostbolttime + timer.frostbolt then
+	if GetTime() < frostbolttime + timer.frostboltSingleCastTime then
 		if string.find(msg, L["attack_trigger1"]) or string.find(msg, L["attack_trigger2"]) or string.find(msg, L["attack_trigger3"]) or string.find(msg, L["attack_trigger4"]) then
 			self:RemoveBar(L["frostbolt_bar"])
 			frostbolttime = 0
@@ -577,12 +574,12 @@ function module:Phase2()
 		self:DelayedMessage(timer.firstMindcontrol  + timer.phase2 - 5, L["phase2_mc_warning"], "Important")
 	end
 	if self.db.profile.detonate then
-		self:DelayedBar(timer.phase2, L["detonate_possible_bar"], timer.firstDetonate, icon.detonate)
-		self:DelayedMessage(timer.firstDetonate + timer.phase2 - 5, L["phase2_detonate_warning"], "Important")
+		self:DelayedIntervalBar(timer.phase2, L["detonate_possible_bar"], timer.detonateTime[1], timer.detonateTime[2], icon.detonate)
+		self:DelayedMessage(timer.detonateTime[1] + timer.phase2 - 5, L["phase2_detonate_warning"], "Important")
 	end
 	if self.db.profile.frostblast then
-		self:DelayedBar(timer.phase2, L["frostblast_bar"], timer.firstFrostblast, icon.frostblast)
-		self:DelayedMessage(timer.firstFrostblast  + timer.phase2 - 5, L["phase2_frostblast_warning"], "Important")
+		self:DelayedIntervalBar(timer.phase2, L["frostblast_bar"], timer.frostblastTime[1], timer.frostblastTime[2], icon.frostblast)
+		self:DelayedMessage(timer.frostblastTime[1]  + timer.phase2 - 5, L["phase2_frostblast_warning"], "Important")
 	end
 
 	if self.db.profile.fbvolley then
@@ -633,8 +630,8 @@ function module:FrostBlast(name)
 		if GetTime()-self.lastFrostBlast>5 then
 			self.lastFrostBlast=GetTime()
 			self:Message(L["frostblast_warning"], "Attention")
-			self:DelayedMessage(timer.frostblast[1] - 5, L["frostblast_soon_message"])
-			self:IntervalBar(L["frostblast_bar"], timer.frostblast[1], timer.frostblast[2], icon.frostblast)
+			self:DelayedMessage(timer.frostblastTime[1] - 5, L["frostblast_soon_message"])
+			self:IntervalBar(L["frostblast_bar"], timer.frostblastTime[1], timer.frostblastTime[2], icon.frostblast)
 		end
 	end
 	if name and name ~= "" then
@@ -649,7 +646,7 @@ function module:Detonate(name)
 			self:Icon(name)
 		end
 		self:Bar(string.format(L["detonate_bar"], name), timer.detonate, icon.detonate)
-		self:IntervalBar(L["detonate_possible_bar"], timer.nextDetonate[1], timer.nextDetonate[2], icon.detonate)
+		self:IntervalBar(L["detonate_possible_bar"], timer.detonateTime[1], timer.detonateTime[2], icon.detonate)
 	end
 end
 
@@ -660,7 +657,7 @@ function module:Frostbolt()
 			self:Message(L["frostbolt_warning"], "Personal")
 		end
 		if self.db.profile.frostboltbar then
-			self:Bar(L["frostbolt_bar"], timer.frostbolt, icon.frostbolt, true, "blue")
+			self:Bar(L["frostbolt_bar"], timer.frostboltSingleCastTime, icon.frostbolt, true, "blue")
 		end
 	end
 end
